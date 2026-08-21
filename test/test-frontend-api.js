@@ -48,7 +48,7 @@ async function run() {
     'Đặt nhắc nhở uống thuốc',
     'POST',
     `/api/devices/${DEVICE_ID}/reminders`,
-    { message: 'UỐNG THUỐC', duration_sec: 15 }
+    { message: 'UỐNG THUỐC', duration_sec: 15, time: Math.floor(Date.now() / 1000) + 10 }
   );
 
   console.log('\n=== Hoàn tất test REST API ===');
