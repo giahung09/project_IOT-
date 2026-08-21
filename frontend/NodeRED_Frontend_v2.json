@@ -1,0 +1,874 @@
+[
+  {
+    "id": "48fabb5689434966",
+    "type": "ui_tab",
+    "name": "H\u1ec7 Th\u1ed1ng Gi\u00e1m S\u00e1t",
+    "icon": "dashboard",
+    "order": 1,
+    "disabled": false,
+    "hidden": false
+  },
+  {
+    "id": "c9ba6dc976004455",
+    "type": "ui_tab",
+    "name": "L\u1ecbch S\u1eed & C\u1ea3nh B\u00e1o",
+    "icon": "history",
+    "order": 2,
+    "disabled": false,
+    "hidden": false
+  },
+  {
+    "id": "3621f2b4d97241f2",
+    "type": "ui_group",
+    "name": "Ch\u1ec9 S\u1ed1 Hi\u1ec7n T\u1ea1i",
+    "tab": "48fabb5689434966",
+    "order": 1,
+    "disp": true,
+    "width": "12",
+    "collapse": false
+  },
+  {
+    "id": "9c905c6421b740aa",
+    "type": "ui_group",
+    "name": "Bi\u1ec3u \u0110\u1ed3 Theo Th\u1eddi Gian Th\u1ef1c",
+    "tab": "48fabb5689434966",
+    "order": 2,
+    "disp": true,
+    "width": "12",
+    "collapse": false
+  },
+  {
+    "id": "5ebc6d56cfc648ae",
+    "type": "ui_group",
+    "name": "Thao T\u00e1c Nhanh",
+    "tab": "48fabb5689434966",
+    "order": 3,
+    "disp": true,
+    "width": "6",
+    "collapse": false
+  },
+  {
+    "id": "53e660a120f041ae",
+    "type": "ui_group",
+    "name": "Bi\u1ec3u \u0110\u1ed3 L\u1ecbch S\u1eed (History Chart)",
+    "tab": "c9ba6dc976004455",
+    "order": 1,
+    "disp": true,
+    "width": "12",
+    "collapse": false
+  },
+  {
+    "id": "7f085736ab734ea1",
+    "type": "ui_group",
+    "name": "B\u1ea3ng D\u1eef Li\u1ec7u L\u1ecbch S\u1eed (History Table)",
+    "tab": "c9ba6dc976004455",
+    "order": 2,
+    "disp": true,
+    "width": "7",
+    "collapse": false
+  },
+  {
+    "id": "7d53e035d9b4482a",
+    "type": "ui_group",
+    "name": "Nh\u1eadt K\u00fd C\u1ea3nh B\u00e1o",
+    "tab": "c9ba6dc976004455",
+    "order": 3,
+    "disp": true,
+    "width": "5",
+    "collapse": false
+  },
+  {
+    "id": "92bad44fdcef4b4b",
+    "type": "mqtt-broker",
+    "name": "Local MQTT Broker",
+    "broker": "localhost",
+    "port": "1883",
+    "clientid": "",
+    "autoConnect": true,
+    "usetls": false,
+    "protocolVersion": "4",
+    "keepalive": "60",
+    "cleansession": true
+  },
+  {
+    "id": "1541fce184164899",
+    "type": "mqtt in",
+    "name": "Nh\u1eadn Data t\u1eeb ESP32",
+    "topic": "devices/esp32_01/telemetry",
+    "qos": "0",
+    "datatype": "json",
+    "broker": "92bad44fdcef4b4b",
+    "nl": false,
+    "rap": true,
+    "rh": 0,
+    "inputs": 0,
+    "x": 170,
+    "y": 100,
+    "wires": [
+      [
+        "f8a4ed2e2e794442"
+      ]
+    ]
+  },
+  {
+    "id": "f8a4ed2e2e794442",
+    "type": "function",
+    "name": "X\u1eed l\u00fd d\u1eef li\u1ec7u",
+    "func": "var data = msg.payload;\nvar spo2 = data.spo2;\nvar bpm = data.bpm;\nvar temp = data.temperature;\n\nreturn [\n    {payload: spo2},\n    {payload: bpm},\n    {payload: temp},\n    {payload: data}\n];",
+    "outputs": 4,
+    "x": 400,
+    "y": 100,
+    "wires": [
+      [
+        "e96c2baf2ab14d83",
+        "9c89997d68cb4033"
+      ],
+      [
+        "1fe6a80dc6a54ed4",
+        "a08ec70feb954452"
+      ],
+      [
+        "ui_gauge_temp_123"
+      ],
+      [
+        "75d5b15b339940e6"
+      ]
+    ]
+  },
+  {
+    "id": "75d5b15b339940e6",
+    "type": "function",
+    "name": "Ki\u1ec3m tra ng\u01b0\u1ee1ng & C\u1ea3nh b\u00e1o",
+    "func": "var data = msg.payload;\nvar lastAlertTime = context.get('lastAlertTime') || 0;\nvar currentTime = new Date().getTime();\n\n// Cooldown 10s\nif (currentTime - lastAlertTime < 10000) {\n    return null;\n}\n\n// L\u1ea5y ng\u01b0\u1ee1ng t\u1eeb global, n\u1ebfu ch\u01b0a c\u00f3 d\u00f9ng default\nvar thresholds = global.get('currentThresholds') || {\n    spo2: { criticalMin: 90 },\n    bpm: { min: 50, max: 120 },\n    temperature: { criticalMin: 35.0, warnMax: 38.0 }\n};\n\nvar s_min = thresholds.spo2.criticalMin;\nvar b_min = thresholds.bpm.min;\nvar b_max = thresholds.bpm.max;\nvar t_min = thresholds.temperature.criticalMin;\nvar t_max = thresholds.temperature.warnMax;\n\nif(data.spo2 < s_min) {\n    context.set('lastAlertTime', currentTime);\n    msg.payload = \"C\u1ea2NH B\u00c1O: SpO2 gi\u1ea3m xu\u1ed1ng m\u1ee9c nguy hi\u1ec3m (\" + data.spo2 + \"%)\";\n    return msg;\n}\nif(data.bpm > b_max || data.bpm < b_min) {\n    context.set('lastAlertTime', currentTime);\n    msg.payload = \"C\u1ea2NH B\u00c1O: Nh\u1ecbp tim b\u1ea5t th\u01b0\u1eddng (\" + data.bpm + \" BPM)\";\n    return msg;\n}\nif(data.temperature > t_max || data.temperature < t_min) {\n    context.set('lastAlertTime', currentTime);\n    msg.payload = \"C\u1ea2NH B\u00c1O: Nhi\u1ec7t \u0111\u1ed9 b\u1ea5t th\u01b0\u1eddng (\" + data.temperature + \" \u00b0C)\";\n    return msg;\n}\nreturn null;",
+    "outputs": 1,
+    "x": 660,
+    "y": 440,
+    "wires": [
+      [
+        "504019e15bc34de9"
+      ]
+    ]
+  },
+  {
+    "id": "504019e15bc34de9",
+    "type": "ui_toast",
+    "name": "Popup C\u1ea3nh B\u00e1o",
+    "position": "top right",
+    "displayTime": "5",
+    "highlight": "red",
+    "sendall": true,
+    "outputs": 0,
+    "raw": false,
+    "topic": "C\u1ea3nh b\u00e1o y t\u1ebf kh\u1ea9n c\u1ea5p!",
+    "x": 900,
+    "y": 420,
+    "wires": []
+  },
+  {
+    "id": "e96c2baf2ab14d83",
+    "type": "ui_gauge",
+    "name": "SpO2 (%)",
+    "group": "3621f2b4d97241f2",
+    "order": 1,
+    "width": "4",
+    "height": 0,
+    "gtype": "gage",
+    "title": "SpO2 (%)",
+    "label": "%",
+    "format": "{{value}}",
+    "min": 0,
+    "max": 100,
+    "colors": [
+      "#ff0000",
+      "#e6e600",
+      "#00ff00"
+    ],
+    "seg1": "90",
+    "seg2": "95",
+    "x": 660,
+    "y": 40,
+    "wires": []
+  },
+  {
+    "id": "1fe6a80dc6a54ed4",
+    "type": "ui_gauge",
+    "name": "Nh\u1ecbp Tim (BPM)",
+    "group": "3621f2b4d97241f2",
+    "order": 2,
+    "width": "4",
+    "height": 0,
+    "gtype": "gage",
+    "title": "Nh\u1ecbp Tim (BPM)",
+    "label": "BPM",
+    "format": "{{value}}",
+    "min": 0,
+    "max": 200,
+    "colors": [
+      "#ff0000",
+      "#00ff00",
+      "#ff0000"
+    ],
+    "seg1": "50",
+    "seg2": "120",
+    "x": 680,
+    "y": 100,
+    "wires": []
+  },
+  {
+    "id": "9c89997d68cb4033",
+    "type": "ui_chart",
+    "name": "Bi\u1ec3u \u0111\u1ed3 SpO2 (Live)",
+    "group": "9c905c6421b740aa",
+    "order": 1,
+    "width": "6",
+    "height": "4",
+    "label": "SpO2 theo th\u1eddi gian",
+    "chartType": "line",
+    "legend": "false",
+    "xformat": "HH:mm:ss",
+    "interpolate": "linear",
+    "nodata": "",
+    "dot": false,
+    "ymin": "70",
+    "ymax": "100",
+    "removeOlder": 1,
+    "removeOlderUnit": "60",
+    "x": 680,
+    "y": 240,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "a08ec70feb954452",
+    "type": "ui_chart",
+    "name": "Bi\u1ec3u \u0111\u1ed3 BPM (Live)",
+    "group": "9c905c6421b740aa",
+    "order": 2,
+    "width": "6",
+    "height": "4",
+    "label": "Nh\u1ecbp tim theo th\u1eddi gian",
+    "chartType": "line",
+    "legend": "false",
+    "xformat": "HH:mm:ss",
+    "interpolate": "linear",
+    "nodata": "",
+    "dot": false,
+    "ymin": "40",
+    "ymax": "150",
+    "removeOlder": 1,
+    "removeOlderUnit": "60",
+    "x": 670,
+    "y": 300,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "c2035486e144492c",
+    "type": "ui_button",
+    "name": "T\u1eaft C\u00f2i T\u1ea1m Th\u1eddi",
+    "group": "5ebc6d56cfc648ae",
+    "order": 1,
+    "width": "6",
+    "height": 0,
+    "passthru": false,
+    "label": "\ud83d\udd15 T\u1eaft C\u00f2i T\u1ea1m Th\u1eddi",
+    "tooltip": "T\u1eaft ti\u1ebfng b\u00edp trong v\u00f2ng 60s",
+    "color": "white",
+    "bgcolor": "orange",
+    "icon": "",
+    "payload": "{\"type\":\"snooze\",\"duration_sec\":60}",
+    "payloadType": "json",
+    "topic": "",
+    "x": 180,
+    "y": 560,
+    "wires": [
+      [
+        "f3bea49ad497474c"
+      ]
+    ]
+  },
+  {
+    "id": "a56b4a0a4aed45c7",
+    "type": "ui_form",
+    "name": "G\u1eedi Nh\u1eafc H\u1eb9n",
+    "group": "5ebc6d56cfc648ae",
+    "order": 2,
+    "width": "6",
+    "height": 0,
+    "label": "\ud83d\udcdd G\u1eedi L\u1eddi Nh\u1eafc \u0110\u1ebfn Thi\u1ebft B\u1ecb",
+    "storeOutMessages": true,
+    "fwdInMessages": true,
+    "cancel": "H\u1ee7y",
+    "submit": "G\u1eedi L\u1ec7nh",
+    "x": 140,
+    "y": 620,
+    "wires": [
+      [
+        "519b6ac37eb14e95"
+      ]
+    ],
+    "options": [
+      {
+        "label": "Khung gi\u1edd nh\u1eafc h\u1eb9n",
+        "value": "time",
+        "type": "time",
+        "required": true
+      },
+      {
+        "label": "N\u1ed9i dung l\u1eddi nh\u1eafc",
+        "value": "message",
+        "type": "text",
+        "required": true
+      }
+    ]
+  },
+  {
+    "id": "f3bea49ad497474c",
+    "type": "function",
+    "name": "Chu\u1ea9n b\u1ecb Request T\u1eaft C\u00f2i",
+    "func": "msg.payload = { duration_sec: 60 };\nmsg.url = \"http://localhost:3000/api/devices/esp32_01/snooze\";\nmsg.method = \"POST\";\nmsg.actionType = \"snooze\";\nreturn msg;",
+    "outputs": 1,
+    "x": 450,
+    "y": 560,
+    "wires": [
+      [
+        "f9869da439aa48f7"
+      ]
+    ]
+  },
+  {
+    "id": "519b6ac37eb14e95",
+    "type": "function",
+    "name": "Chu\u1ea9n b\u1ecb Request Nh\u1eafc H\u1eb9n",
+    "func": "var targetTime = msg.payload.time;\nvar message = msg.payload.message;\nvar now = new Date();\nvar parts = targetTime.split(':');\nvar targetDate = new Date();\ntargetDate.setHours(parseInt(parts[0]), parseInt(parts[1]), 0, 0);\nif (targetDate.getTime() < now.getTime()) { targetDate.setDate(targetDate.getDate() + 1); }\nvar delayMs = targetDate.getTime() - now.getTime();\nvar delayMsg = { url: \"http://localhost:3000/api/devices/esp32_01/reminders\", method: \"POST\", actionType: \"reminder\", originalMessage: message, payload: { message: message, duration_sec: 15 }, delay: delayMs };\nvar toastMsg = { payload: \"\u0110\u00e3 l\u00ean l\u1ecbch nh\u1eafc '\" + message + \"' v\u00e0o l\u00fac \" + targetTime, topic: \"H\u1ec7 th\u1ed1ng nh\u1eafc h\u1eb9n\" };\nreturn [delayMsg, toastMsg];",
+    "outputs": 2,
+    "x": 460,
+    "y": 620,
+    "wires": [
+      [
+        "delay_reminder_123"
+      ],
+      [
+        "dd03f393a9e74770"
+      ]
+    ]
+  },
+  {
+    "id": "f9869da439aa48f7",
+    "type": "http request",
+    "name": "G\u1ecdi Backend API",
+    "method": "use",
+    "ret": "obj",
+    "paytoqs": "ignore",
+    "url": "",
+    "tls": "",
+    "persist": false,
+    "proxy": "",
+    "insecureHTTPParser": false,
+    "authType": "",
+    "senderr": false,
+    "headers": [],
+    "x": 680,
+    "y": 580,
+    "wires": [
+      [
+        "b0ac6db8ea1a4fdf"
+      ]
+    ]
+  },
+  {
+    "id": "b0ac6db8ea1a4fdf",
+    "type": "function",
+    "name": "X\u1eed l\u00fd Response",
+    "func": "if (msg.payload && msg.payload.success) {\n    if (msg.actionType === 'set_threshold') {\n        msg.payload = \"C\u1eadp nh\u1eadt ng\u01b0\u1ee1ng c\u1ea3nh b\u00e1o th\u00e0nh c\u00f4ng!\";\n    } else if (msg.actionType === 'snooze') {\n        msg.payload = \"\u0110\u00e3 g\u1eedi l\u1ec7nh t\u1eaft c\u00f2i \u0111\u1ebfn thi\u1ebft b\u1ecb th\u00e0nh c\u00f4ng!\";\n    } else if (msg.actionType === 'reminder') {\n        msg.payload = \"\u0110\u00e3 g\u1eedi l\u1ec7nh nh\u1eafc h\u1eb9n: \" + msg.originalMessage;\n    } else {\n        msg.payload = \"L\u1ec7nh th\u1ef1c thi th\u00e0nh c\u00f4ng!\";\n    }\n} else {\n    msg.payload = \"L\u1ed7i khi g\u1ecdi API: \" + JSON.stringify(msg.payload);\n}\nreturn msg;",
+    "outputs": 1,
+    "x": 880,
+    "y": 580,
+    "wires": [
+      [
+        "dd03f393a9e74770"
+      ]
+    ]
+  },
+  {
+    "id": "dd03f393a9e74770",
+    "type": "ui_toast",
+    "name": "Toast K\u1ebft Qu\u1ea3",
+    "position": "bottom right",
+    "displayTime": "3",
+    "highlight": "blue",
+    "sendall": true,
+    "outputs": 0,
+    "ok": "OK",
+    "raw": false,
+    "topic": "H\u1ec7 th\u1ed1ng:",
+    "x": 1070,
+    "y": 580,
+    "wires": []
+  },
+  {
+    "id": "a831c270965c4975",
+    "type": "inject",
+    "name": "L\u1ea5y L\u1ecbch S\u1eed (10s)",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "10",
+    "crontab": "",
+    "once": true,
+    "onceDelay": 0.5,
+    "topic": "",
+    "payload": "",
+    "payloadType": "date",
+    "x": 170,
+    "y": 700,
+    "wires": [
+      [
+        "33fe6b39151c4cf6"
+      ]
+    ]
+  },
+  {
+    "id": "33fe6b39151c4cf6",
+    "type": "http request",
+    "name": "GET /api/devices/esp32_01/history",
+    "method": "GET",
+    "ret": "obj",
+    "paytoqs": "ignore",
+    "url": "http://localhost:3000/api/devices/esp32_01/history?limit=50",
+    "tls": "",
+    "persist": false,
+    "proxy": "",
+    "insecureHTTPParser": false,
+    "authType": "",
+    "senderr": false,
+    "headers": [],
+    "x": 370,
+    "y": 700,
+    "wires": [
+      [
+        "ec1f2967db414b75"
+      ]
+    ]
+  },
+  {
+    "id": "ec1f2967db414b75",
+    "type": "function",
+    "name": "Format History",
+    "func": "var history = msg.payload;\nif (!Array.isArray(history)) return null;\n\nvar spo2Data = [];\nvar bpmData = [];\nvar tempData = [];\n\nfor(var i=0; i<history.length; i++) {\n    var ts = history[i].timestamp * 1000;\n    // Node-RED ui_chart expects x in milliseconds\n    spo2Data.push({x: ts, y: history[i].spo2});\n    bpmData.push({x: ts, y: history[i].bpm});\n    tempData.push({x: ts, y: history[i].temperature});\n}\n\n// Format chu\u1ea9n c\u1ee7a Node-RED Dashboard cho bulk update chart\nvar chartMsg = {\n    payload: [{\n        series: [\"SpO2 (%)\", \"Nh\u1ecbp tim (BPM)\", \"Nhi\u1ec7t \u0111\u1ed9 (\u00b0C)\"],\n        data: [\n            spo2Data,\n            bpmData,\n            tempData\n        ],\n        labels: [\"SpO2\", \"BPM\", \"Nhi\u1ec7t \u0111\u1ed9\"]\n    }]\n};\n\nvar tableMsg = { payload: history };\n\nreturn [chartMsg, tableMsg];",
+    "outputs": 2,
+    "x": 580,
+    "y": 700,
+    "wires": [
+      [
+        "3221835da24a4362"
+      ],
+      [
+        "db1abf53ecf14c85"
+      ]
+    ]
+  },
+  {
+    "id": "3221835da24a4362",
+    "type": "ui_chart",
+    "name": "Bi\u1ec3u \u0111\u1ed3 L\u1ecbch s\u1eed",
+    "group": "53e660a120f041ae",
+    "order": 1,
+    "width": "12",
+    "height": "6",
+    "label": "Xu h\u01b0\u1edbng SpO2 v\u00e0 BPM trong qu\u00e1 kh\u1ee9",
+    "chartType": "line",
+    "legend": "true",
+    "xformat": "HH:mm:ss dd/MM",
+    "interpolate": "linear",
+    "nodata": "\u0110ang t\u1ea3i d\u1eef li\u1ec7u...",
+    "dot": false,
+    "ymin": "30",
+    "ymax": "150",
+    "removeOlder": 1,
+    "removeOlderUnit": "86400",
+    "x": 800,
+    "y": 680,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "db1abf53ecf14c85",
+    "type": "ui_template",
+    "name": "B\u1ea3ng L\u1ecbch S\u1eed",
+    "group": "7f085736ab734ea1",
+    "order": 1,
+    "width": "7",
+    "height": 0,
+    "format": "<div style=\"height: 300px; overflow-y: auto;\">\n<table style=\"width:100%; border-collapse: collapse; font-size: 14px; text-align: left;\">\n  <tr style=\"background-color:#eee; position: sticky; top: 0;\"><th style=\"border: 1px solid #ddd; padding: 10px;\">Th\u1eddi gian</th><th style=\"border: 1px solid #ddd; padding: 10px;\">SpO2</th><th style=\"border: 1px solid #ddd; padding: 10px;\">BPM</th><th style=\"border: 1px solid #ddd; padding: 10px;\">Nhi\u1ec7t \u0111\u1ed9</th></tr>\n  <tr ng-repeat=\"row in msg.payload | orderBy:'-time'\">\n    <td style=\"border: 1px solid #ddd; padding: 10px;\">{{(row.timestamp * 1000) | date:'HH:mm:ss dd/MM/yyyy'}}</td>\n    <td style=\"border: 1px solid #ddd; padding: 10px;\">{{row.spo2}}%</td>\n    <td style=\"border: 1px solid #ddd; padding: 10px;\">{{row.bpm}}</td><td style=\"border: 1px solid #ddd; padding: 10px;\">{{row.temperature}}\u00b0C</td>\n  </tr>\n</table>\n</div>",
+    "storeOutMessages": true,
+    "fwdInMessages": true,
+    "resizes": true,
+    "templateScope": "local",
+    "className": "",
+    "x": 790,
+    "y": 720,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "1a61af069fed467a",
+    "type": "inject",
+    "name": "L\u1ea5y C\u1ea3nh B\u00e1o (10s)",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "10",
+    "crontab": "",
+    "once": true,
+    "onceDelay": 0.5,
+    "topic": "",
+    "payload": "",
+    "payloadType": "date",
+    "x": 170,
+    "y": 800,
+    "wires": [
+      [
+        "67d179e20ccd44d3"
+      ]
+    ]
+  },
+  {
+    "id": "67d179e20ccd44d3",
+    "type": "http request",
+    "name": "GET /api/devices/esp32_01/alerts",
+    "method": "GET",
+    "ret": "obj",
+    "paytoqs": "ignore",
+    "url": "http://localhost:3000/api/devices/esp32_01/alerts?limit=20",
+    "tls": "",
+    "persist": false,
+    "proxy": "",
+    "insecureHTTPParser": false,
+    "authType": "",
+    "senderr": false,
+    "headers": [],
+    "x": 370,
+    "y": 800,
+    "wires": [
+      [
+        "877977ca68084390"
+      ]
+    ]
+  },
+  {
+    "id": "877977ca68084390",
+    "type": "ui_template",
+    "name": "B\u1ea3ng C\u1ea3nh B\u00e1o",
+    "group": "7d53e035d9b4482a",
+    "order": 1,
+    "width": "5",
+    "height": 0,
+    "format": "<div style=\"height: 300px; overflow-y: auto;\">\n<table style=\"width:100%; border-collapse: collapse; font-size: 14px; text-align: left;\">\n  <tr style=\"background-color:#fee; position: sticky; top: 0;\"><th style=\"border: 1px solid #ddd; padding: 10px;\">Th\u1eddi gian</th><th style=\"border: 1px solid #ddd; padding: 10px;\">N\u1ed9i dung</th></tr>\n  <tr ng-repeat=\"row in msg.payload | orderBy:'-timestamp'\">\n    <td style=\"border: 1px solid #ddd; padding: 10px; color: red;\">{{row.timestamp * 1000 | date:'HH:mm:ss dd/MM/yyyy'}}</td>\n    <td style=\"border: 1px solid #ddd; padding: 10px; color: red;\">{{row.value}}</td>\n  </tr>\n</table>\n</div>",
+    "storeOutMessages": true,
+    "fwdInMessages": true,
+    "resizes": true,
+    "templateScope": "local",
+    "className": "",
+    "x": 580,
+    "y": 800,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "ui_gauge_temp_123",
+    "type": "ui_gauge",
+    "name": "Nhi\u1ec7t \u0111\u1ed9 (\u00b0C)",
+    "group": "3621f2b4d97241f2",
+    "order": 3,
+    "width": "4",
+    "height": 0,
+    "gtype": "gage",
+    "title": "Nhi\u1ec7t \u0110\u1ed9 (\u00b0C)",
+    "label": "\u00b0C",
+    "format": "{{value}}",
+    "min": 30,
+    "max": 45,
+    "colors": [
+      "#d62728",
+      "#2ca02c",
+      "#d62728"
+    ],
+    "seg1": 35,
+    "seg2": 38,
+    "x": 660,
+    "y": 160,
+    "wires": []
+  },
+  {
+    "id": "delay_reminder_123",
+    "type": "delay",
+    "name": "Ch\u1edd \u0111\u1ebfn gi\u1edd h\u1eb9n",
+    "pauseType": "delayv",
+    "timeout": "5",
+    "timeoutUnits": "seconds",
+    "rate": "1",
+    "nbRateUnits": "1",
+    "rateUnits": "second",
+    "randomFirst": "1",
+    "randomLast": "5",
+    "randomUnits": "seconds",
+    "drop": false,
+    "outputs": 1,
+    "x": 600,
+    "y": 650,
+    "wires": [
+      [
+        "f9869da439aa48f7"
+      ]
+    ]
+  },
+  {
+    "id": "form_threshold_456",
+    "type": "ui_form",
+    "name": "C\u1eadp Nh\u1eadt Ng\u01b0\u1ee1ng",
+    "group": "12cf826f0e379106",
+    "order": 3,
+    "width": "6",
+    "height": 0,
+    "label": "\u2699\ufe0f \u0110i\u1ec1u Ch\u1ec9nh Ng\u01b0\u1ee1ng C\u1ea3nh B\u00e1o",
+    "storeOutMessages": true,
+    "fwdInMessages": true,
+    "cancel": "H\u1ee7y",
+    "submit": "L\u01b0u Ng\u01b0\u1ee1ng",
+    "x": 150,
+    "y": 500,
+    "wires": [
+      [
+        "func_threshold_789"
+      ]
+    ],
+    "options": [
+      {
+        "label": "SpO2 Nguy Hi\u1ec3m Min (%)",
+        "value": "spo2_criticalMin",
+        "type": "number",
+        "required": true
+      },
+      {
+        "label": "Nh\u1ecbp Tim C\u1ea3nh B\u00e1o Min (BPM)",
+        "value": "bpm_min",
+        "type": "number",
+        "required": true
+      },
+      {
+        "label": "Nh\u1ecbp Tim C\u1ea3nh B\u00e1o Max (BPM)",
+        "value": "bpm_max",
+        "type": "number",
+        "required": true
+      },
+      {
+        "label": "Nhi\u1ec7t \u0110\u1ed9 Nguy Hi\u1ec3m Min (\u00b0C)",
+        "value": "temp_criticalMin",
+        "type": "number",
+        "required": true
+      },
+      {
+        "label": "Nhi\u1ec7t \u0110\u1ed9 C\u1ea3nh B\u00e1o Max (\u00b0C)",
+        "value": "temp_warnMax",
+        "type": "number",
+        "required": true
+      }
+    ]
+  },
+  {
+    "id": "func_threshold_789",
+    "type": "function",
+    "name": "Chu\u1ea9n b\u1ecb Request Ng\u01b0\u1ee1ng",
+    "func": "var p = msg.payload;\n\nvar s_min = Number(p.spo2_criticalMin);\nvar b_min = Number(p.bpm_min);\nvar b_max = Number(p.bpm_max);\nvar t_min = Number(p.temp_criticalMin);\nvar t_max = Number(p.temp_warnMax);\n\n// Gi\u1edbi h\u1ea1n trong kho\u1ea3ng quy \u0111\u1ecbnh\ns_min = Math.max(50, Math.min(99, s_min));\n\nb_min = Math.max(30, Math.min(150, b_min));\nb_max = Math.max(50, Math.min(220, b_max));\nif (b_min >= b_max) b_max = b_min + 1;\n\nt_min = Math.max(34.0, Math.min(37.0, t_min));\nt_max = Math.max(37.0, Math.min(42.0, t_max));\nif (t_min >= t_max) t_max = t_min + 0.1;\n\nmsg.payload = {\n    spo2: { criticalMin: s_min },\n    bpm: { min: b_min, max: b_max },\n    temperature: { criticalMin: Number(t_min.toFixed(1)), warnMax: Number(t_max.toFixed(1)) }\n};\n\nglobal.set('currentThresholds', msg.payload);\n\nmsg.url = \"http://localhost:3000/api/devices/esp32_01/thresholds\";\nmsg.method = \"PUT\";\nmsg.actionType = \"set_threshold\";\n\nreturn [msg, null];",
+    "outputs": 2,
+    "x": 450,
+    "y": 500,
+    "wires": [
+      [
+        "f9869da439aa48f7"
+      ],
+      [
+        "dd03f393a9e74770"
+      ]
+    ]
+  },
+  {
+    "id": "12cf826f0e379106",
+    "type": "ui_group",
+    "name": "C\u00e0i \u0110\u1eb7t Ng\u01b0\u1ee1ng",
+    "tab": "48fabb5689434966",
+    "order": 4,
+    "disp": true,
+    "width": "6",
+    "collapse": false
+  },
+  {
+    "id": "0f9c5e4ccf422d9e",
+    "type": "ui_base",
+    "theme": {
+      "name": "theme-dark",
+      "lightTheme": {
+        "default": "#0094CE",
+        "baseColor": "#0094CE",
+        "baseFont": "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Oxygen-Sans,Ubuntu,Cantarell,Helvetica Neue,sans-serif",
+        "edited": true
+      },
+      "darkTheme": {
+        "default": "#097479",
+        "baseColor": "#097479",
+        "baseFont": "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Oxygen-Sans,Ubuntu,Cantarell,Helvetica Neue,sans-serif",
+        "edited": true
+      },
+      "customTheme": {
+        "name": "Untitled Theme 1",
+        "default": "#4B7930",
+        "baseColor": "#4B7930",
+        "baseFont": "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Oxygen-Sans,Ubuntu,Cantarell,Helvetica Neue,sans-serif"
+      },
+      "themeState": {
+        "base-color": {
+          "default": "#097479",
+          "value": "#097479",
+          "edited": false
+        },
+        "page-titlebar-backgroundColor": {
+          "value": "#097479",
+          "edited": false
+        },
+        "page-backgroundColor": {
+          "value": "#111111",
+          "edited": false
+        },
+        "page-sidebar-backgroundColor": {
+          "value": "#333333",
+          "edited": false
+        },
+        "group-textColor": {
+          "value": "#097479",
+          "edited": false
+        },
+        "group-borderColor": {
+          "value": "#555555",
+          "edited": false
+        },
+        "group-backgroundColor": {
+          "value": "#333333",
+          "edited": false
+        },
+        "widget-textColor": {
+          "value": "#eeeeee",
+          "edited": false
+        },
+        "widget-backgroundColor": {
+          "value": "#097479",
+          "edited": false
+        },
+        "widget-borderColor": {
+          "value": "#333333",
+          "edited": false
+        },
+        "base-font": {
+          "value": "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Oxygen-Sans,Ubuntu,Cantarell,Helvetica Neue,sans-serif"
+        }
+      },
+      "angularTheme": {
+        "primary": "indigo",
+        "accents": "blue",
+        "warn": "red",
+        "background": "grey",
+        "palette": "dark"
+      }
+    },
+    "site": {
+      "name": "H\u1ec7 th\u1ed1ng Y t\u1ebf",
+      "hideToolbar": "false",
+      "allowSwipe": "false",
+      "lockMenu": "false",
+      "allowTempTheme": "true",
+      "dateFormat": "DD/MM/YYYY",
+      "sizes": {
+        "sx": 48,
+        "sy": 48,
+        "gx": 6,
+        "gy": 6,
+        "cx": 6,
+        "cy": 6,
+        "px": 0,
+        "py": 0
+      }
+    }
+  },
+  {
+    "id": "a0b8725e6300fe55",
+    "type": "inject",
+    "name": "Kh\u1edfi \u0111\u1ed9ng (L\u1ea5y Ng\u01b0\u1ee1ng)",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": true,
+    "onceDelay": 0.5,
+    "topic": "",
+    "payload": "",
+    "payloadType": "date",
+    "x": 170,
+    "y": 100,
+    "wires": [
+      [
+        "ea0e42d48b29de7b"
+      ]
+    ]
+  },
+  {
+    "id": "ea0e42d48b29de7b",
+    "type": "http request",
+    "name": "GET Thresholds",
+    "method": "GET",
+    "ret": "obj",
+    "paytoqs": "ignore",
+    "url": "http://localhost:3000/api/devices/esp32_01/thresholds",
+    "tls": "",
+    "persist": false,
+    "proxy": "",
+    "insecureHTTPParser": false,
+    "authType": "",
+    "senderr": false,
+    "headers": [],
+    "x": 380,
+    "y": 100,
+    "wires": [
+      [
+        "9be261bd48358dca"
+      ]
+    ]
+  },
+  {
+    "id": "9be261bd48358dca",
+    "type": "function",
+    "name": "L\u01b0u Thresholds v\u00e0o Global",
+    "func": "global.set('currentThresholds', msg.payload);\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 620,
+    "y": 100,
+    "wires": [
+      []
+    ]
+  }
+]
