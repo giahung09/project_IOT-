@@ -41,7 +41,7 @@ async function sendTelegram(text) {
 /**
  * Gửi thông báo cảnh báo bất thường — nội dung gồm thời gian, SpO2, BPM,
  */
-async function notifyAlert({ deviceId, timestamp, spo2, bpm, type, message }) {
+async function notifyAlert({ deviceId, timestamp, spo2, bpm, temperature, type, message }) {
   const time = new Date(timestamp * 1000).toLocaleString('vi-VN', {
   timeZone: 'Asia/Ho_Chi_Minh',
   hour12: false,
@@ -52,6 +52,7 @@ async function notifyAlert({ deviceId, timestamp, spo2, bpm, type, message }) {
     `Thiết bị: ${deviceId}`,
     `SpO2: ${spo2}%`,
     `BPM: ${bpm}`,
+    `Nhiệt độ: ${temperature}°C`,
     `Nội dung: ${message}`,
   ].join('\n');
 

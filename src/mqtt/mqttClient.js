@@ -8,6 +8,15 @@ const mqtt = require('mqtt');
 const net = require('net');
 const config = require('../config/mqtt.config');
 
+function startEmbeddedBroker(port) {
+  const aedes = require('aedes')();
+  const server = net.createServer(aedes.handle);
+  server.listen(port, () => {
+    console.log(`[MQTT-BROKER] Aedes broker đang chạy ở port ${port}`);
+  });
+  return server;
+}
+
 function createBackendMqttClient() {
   let brokerHandle = null;
   if (config.DEV_EMBEDDED_BROKER) {
@@ -24,9 +33,9 @@ function createBackendMqttClient() {
   client.on('connect', () => {
     // eslint-disable-next-line no-console
     console.log(`[MQTT] Backend đã kết nối tới broker: ${config.BROKER_URL}`);
-    client.subscribe([config.TOPICS.DEVICE_DATA, config.TOPICS.DEVICE_STATUS], { qos: 1 }, (err) => {
+    client.subscribe([config.TOPICS.TELEMETRY, config.TOPICS.STATUS], { qos: 1 }, (err) => {
       if (err) console.error('[MQTT] Lỗi subscribe:', err);
-      else console.log(`[MQTT] Đã subscribe: ${config.TOPICS.DEVICE_DATA}, ${config.TOPICS.DEVICE_STATUS}`);
+      else console.log(`[MQTT] Đã subscribe: ${config.TOPICS.TELEMETRY}, ${config.TOPICS.STATUS}`);
     });
   });
 

@@ -24,7 +24,7 @@ function start() {
     res.json({ ok: true, firebaseMode: firebaseService.mode, uptime: process.uptime() });
   });
 
-  app.use('/api/v1', buildApiRouter(mqttClient));
+  app.use('/api', buildApiRouter(mqttClient));
 
   app.use((err, req, res, next) => {
     console.error('[HTTP] Lỗi không xác định:', err);

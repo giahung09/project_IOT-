@@ -1,100 +1,90 @@
 /**
- * Controllers cho REST API (mục III.2 "Chi tiết REST API"), phục vụ Luồng 1
- * (Dashboard -> Backend -> ESP32) và Luồng 3 (Backend -> Dashboard).
+ * Controllers cho REST API, cập nhật theo chuẩn Biên bản Thống nhất Kỹ thuật
  */
 const firebaseService = require('../services/firebase.service');
-const { validateBuzzerRequest, validateThresholdRequest } = require('../utils/validators');
-const { setThresholdsForDevice, getThresholdsForDevice } = require('../config/thresholds.config');
+const { getThresholdsForDevice, setThresholdsForDevice } = require('../config/thresholds.config');
 const { publishControl } = require('../mqtt/mqttHandlers');
-
-const DEFAULT_DEVICE_ID = process.env.DEFAULT_DEVICE_ID || 'esp32_001';
 
 function makeControllers(mqttClient) {
   return {
-    // GET /api/v1/latest
     async getLatest(req, res) {
-      const deviceId = req.query.deviceId || DEFAULT_DEVICE_ID;
+      const deviceId = req.params.id;
       const latest = await firebaseService.getLatestTelemetry(deviceId);
-      if (!latest) {
-        return res.status(404).json({ error: 'Chưa có dữ liệu cho thiết bị này' });
-      }
-      res.json({ spo2: latest.spo2, bpm: latest.bpm, status: latest.status });
+      if (!latest) return res.status(404).json({ error: 'Chưa có dữ liệu' });
+      res.json(latest);
     },
 
-    // GET /api/v1/history?deviceId=...&limit=...
     async getHistory(req, res) {
-      const deviceId = req.query.deviceId || DEFAULT_DEVICE_ID;
+      const deviceId = req.params.id;
       const limit = Number(req.query.limit) || 50;
       const history = await firebaseService.getHistory(deviceId, limit);
-      res.json(
-        history.map((h) => ({
-          time: new Date(h.timestamp * 1000).toISOString(),
-          spo2: h.spo2,
-          bpm: h.bpm,
-          status: h.status,
-        }))
-      );
+      res.json(history);
     },
 
-    // POST /api/v1/device/buzzer   { state: true|false }
-    async setBuzzer(req, res) {
-      const deviceId = req.query.deviceId || DEFAULT_DEVICE_ID;
-      const validation = validateBuzzerRequest(req.body);
-      if (!validation.valid) {
-        return res.status(400).json({ success: false, error: validation.error });
-      }
-      try {
-        publishControl(mqttClient, deviceId, 'buzzer', { state: req.body.state });
-        res.json({ success: true });
-      } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
-      }
-    },
-
-    // GET /api/v1/device/status?deviceId=...
-    async getDeviceStatus(req, res) {
-      const deviceId = req.query.deviceId || DEFAULT_DEVICE_ID;
-      const device = await firebaseService.getDevice(deviceId);
-      res.json({ online: !!(device && device.online) });
-    },
-
-    // GET /api/v1/alerts?deviceId=...
     async getAlerts(req, res) {
-      const deviceId = req.query.deviceId;
-      const alerts = await firebaseService.getAlerts(deviceId, Number(req.query.limit) || 50);
+      const deviceId = req.params.id;
+      const limit = Number(req.query.limit) || 50;
+      const alerts = await firebaseService.getAlerts(deviceId, limit);
       res.json(alerts);
     },
 
-    // PUT /api/v1/device/:deviceId/thresholds  — tính năng bổ sung: ngưỡng riêng theo đối tượng
+    async getThresholds(req, res) {
+      const deviceId = req.params.id;
+      // Trả về từ config in-memory (có fallback default) hoặc firebase
+      const fromDb = await firebaseService.getThresholds(deviceId);
+      res.json(fromDb || getThresholdsForDevice(deviceId));
+    },
+
     async setThresholds(req, res) {
-      const { deviceId } = req.params;
-      const validation = validateThresholdRequest(req.body);
-      if (!validation.valid) {
-        return res.status(400).json({ success: false, error: validation.error });
-      }
-      const updated = setThresholdsForDevice(deviceId, req.body);
+      const deviceId = req.params.id;
+      const payload = req.body;
+      
+      const updated = setThresholdsForDevice(deviceId, payload);
+      await firebaseService.setThresholds(deviceId, updated);
+
+      // Gửi lệnh set_threshold xuống ESP32
+      publishControl(mqttClient, deviceId, 'set_threshold', {
+        spo2_min: updated.spo2.criticalMin,
+        bpm_min: updated.bpm.min,
+        bpm_max: updated.bpm.max,
+        temp_min: updated.temperature.criticalMin,
+        temp_max: updated.temperature.warnMax
+      });
+
       res.json({ success: true, thresholds: updated });
     },
 
-    // GET /api/v1/device/:deviceId/thresholds
-    async getThresholds(req, res) {
-      const { deviceId } = req.params;
-      res.json(getThresholdsForDevice(deviceId));
+    async getReminders(req, res) {
+      const deviceId = req.params.id;
+      const reminders = await firebaseService.getReminders(deviceId);
+      res.json(reminders);
     },
 
-    // POST /api/v1/device/:deviceId/oled/message — tính năng bổ sung: hẹn giờ nhắn tin OLED
-    async setOledMessage(req, res) {
-      const { deviceId } = req.params;
-      const { message, scheduleTime } = req.body || {};
-      if (!message) return res.status(400).json({ success: false, error: "Thiếu trường 'message'" });
-      try {
-        publishControl(mqttClient, deviceId, 'oled', { message, scheduleTime: scheduleTime || null });
-        res.json({ success: true });
-      } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
-      }
+    async addReminder(req, res) {
+      const deviceId = req.params.id;
+      const { message, duration_sec } = req.body;
+      if (!message) return res.status(400).json({ error: 'Thiếu message' });
+      
+      const reminder = { time: Math.floor(Date.now() / 1000), message, status: 'active' };
+      const id = await firebaseService.addReminder(deviceId, reminder);
+
+      publishControl(mqttClient, deviceId, 'reminder', { message, duration_sec: duration_sec || 15 });
+      res.json({ success: true, id, reminder });
     },
+
+    async deleteReminder(req, res) {
+      const { id, reminderId } = req.params;
+      await firebaseService.deleteReminder(id, reminderId);
+      res.json({ success: true });
+    },
+
+    async snoozeAlert(req, res) {
+      const deviceId = req.params.id;
+      const { duration_sec } = req.body;
+      publishControl(mqttClient, deviceId, 'snooze', { duration_sec: duration_sec || 60 });
+      res.json({ success: true });
+    }
   };
 }
 
-module.exports = { makeControllers, DEFAULT_DEVICE_ID };
+module.exports = { makeControllers };

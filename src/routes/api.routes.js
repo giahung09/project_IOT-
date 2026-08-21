@@ -6,19 +6,18 @@ function buildApiRouter(mqttClient) {
   const router = express.Router();
   const ctrl = makeControllers(mqttClient);
 
-  // ---- Luồng 3: Backend -> Dashboard ----
-  router.get('/latest', asyncHandler(ctrl.getLatest));
-  router.get('/history', asyncHandler(ctrl.getHistory));
-  router.get('/alerts', asyncHandler(ctrl.getAlerts));
+  router.get('/devices/:id/latest', asyncHandler(ctrl.getLatest));
+  router.get('/devices/:id/history', asyncHandler(ctrl.getHistory));
+  router.get('/devices/:id/alerts', asyncHandler(ctrl.getAlerts));
+  
+  router.get('/devices/:id/thresholds', asyncHandler(ctrl.getThresholds));
+  router.put('/devices/:id/thresholds', asyncHandler(ctrl.setThresholds));
 
-  // ---- Luồng 1: Dashboard -> Backend -> ESP32 ----
-  router.post('/device/buzzer', asyncHandler(ctrl.setBuzzer));
-  router.get('/device/status', asyncHandler(ctrl.getDeviceStatus));
+  router.get('/devices/:id/reminders', asyncHandler(ctrl.getReminders));
+  router.post('/devices/:id/reminders', asyncHandler(ctrl.addReminder));
+  router.delete('/devices/:id/reminders/:reminderId', asyncHandler(ctrl.deleteReminder));
 
-  // ---- Tính năng bổ sung ----
-  router.get('/device/:deviceId/thresholds', asyncHandler(ctrl.getThresholds));
-  router.put('/device/:deviceId/thresholds', asyncHandler(ctrl.setThresholds));
-  router.post('/device/:deviceId/oled/message', asyncHandler(ctrl.setOledMessage));
+  router.post('/devices/:id/snooze', asyncHandler(ctrl.snoozeAlert));
 
   return router;
 }
