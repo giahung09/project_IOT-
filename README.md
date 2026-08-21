@@ -13,7 +13,7 @@ khiển thiết bị và thông báo Email/Telegram khi có cảnh báo.
 | Email cảnh báo (nhiều người nhận) | ✅ Xong |
 | Firebase Realtime Database thật | ✅ Xong |
 | MQTT Broker thật | ✅ Xong |
-| Frontend (Node-RED Dashboard) | ⏳ Chưa làm — xem mục "Định hướng tiếp theo" |
+| Frontend (Node-RED Dashboard) | ✅ Đã hoàn thành (xem thư mục `frontend`) |
 | ESP32 firmware thật | ⏳ Chưa làm — xem mục "Định hướng tiếp theo" |
 
 ## 1. Cấu trúc thư mục
