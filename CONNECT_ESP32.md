@@ -109,8 +109,34 @@ void callback(char* topic, byte* payload, unsigned int length) {
   serializeJson(doc, Serial);
   Serial.println();
   
-  // Xử lý bật tắt Buzzer, LED tùy theo lệnh từ JSON (thêm logic của bạn)
-  // Ví dụ: bool buzzerState = doc["buzzer"]; 
+  const char* type = doc["type"];
+  
+  // 1. Xử lý lệnh Còi (Buzzer)
+  if (strcmp(type, "buzzer") == 0) {
+    bool buzzerState = doc["state"];
+    digitalWrite(BUZZER_PIN, buzzerState ? HIGH : LOW);
+  }
+  
+  // 2. Xử lý lệnh Nhắc hẹn Y tế (OLED)
+  else if (strcmp(type, "reminder") == 0) {
+    const char* message = doc["message"];       // Nội dung nhắc (VD: "UONG THUOC")
+    int duration = doc["duration_sec"];         // Thời gian nhấp nháy OLED và kêu còi
+    // Kích hoạt còi và hiển thị chữ to chớp nháy trên OLED trong <duration> giây
+    // Sau đó tự động tắt còi và quay lại màn hình đo nhịp tim
+    triggerReminderOLED(message, duration);
+  }
+  
+  // 3. Xử lý lệnh Đèn LED cảnh báo sức khỏe
+  else if (strcmp(type, "led") == 0) {
+    const char* color = doc["color"];
+    if (strcmp(color, "GREEN") == 0) {
+      // Sức khỏe bình thường -> Bật LED Xanh
+    } else if (strcmp(color, "YELLOW") == 0) {
+      // Cảnh báo nhẹ -> Bật LED Vàng
+    } else if (strcmp(color, "RED") == 0) {
+      // Nguy hiểm -> Bật LED Đỏ (và có thể kèm theo còi)
+    }
+  }
 }
 ```
 

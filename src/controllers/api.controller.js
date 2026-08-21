@@ -62,13 +62,27 @@ function makeControllers(mqttClient) {
 
     async addReminder(req, res) {
       const deviceId = req.params.id;
-      const { message, duration_sec } = req.body;
+      const { message, duration_sec, time } = req.body;
       if (!message) return res.status(400).json({ error: 'Thiếu message' });
+      if (!time) return res.status(400).json({ error: 'Thiếu time (Unix timestamp)' });
       
-      const reminder = { time: Math.floor(Date.now() / 1000), message, status: 'active' };
+      const reminder = { time: Number(time), message, status: 'pending', duration_sec: duration_sec || 15 };
       const id = await firebaseService.addReminder(deviceId, reminder);
 
-      publishControl(mqttClient, deviceId, 'reminder', { message, duration_sec: duration_sec || 15 });
+      // Tính khoảng thời gian chờ (delay)
+      const now = Math.floor(Date.now() / 1000);
+      let delayMs = (reminder.time - now) * 1000;
+      if (delayMs < 0) delayMs = 0; // Nếu thời gian trong quá khứ thì gửi ngay
+      
+      // Hẹn giờ gửi lệnh OLED và Còi xuống mạch ESP32
+      setTimeout(() => {
+        publishControl(mqttClient, deviceId, 'reminder', { 
+          message: reminder.message, 
+          duration_sec: reminder.duration_sec 
+        });
+        console.log(`[Reminder] Đã gửi thông báo hẹn giờ: "${reminder.message}" tới ${deviceId}`);
+      }, delayMs);
+
       res.json({ success: true, id, reminder });
     },
 

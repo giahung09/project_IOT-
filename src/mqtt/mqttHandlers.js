@@ -19,14 +19,14 @@ function attachHandlers(mqttClient) {
     }
 
     if (topic.endsWith('/telemetry')) {
-      await handleDeviceData(payload);
+      await handleDeviceData(payload, mqttClient);
     } else if (topic.endsWith('/status')) {
       await handleDeviceStatus(payload);
     }
   });
 }
 
-async function handleDeviceData(payload) {
+async function handleDeviceData(payload, mqttClient) {
   const { device_id, deviceId: legacyId, spo2, bpm, temperature, timestamp } = payload;
   const deviceId = device_id || legacyId;
 
@@ -58,6 +58,12 @@ async function handleDeviceData(payload) {
   });
 
   console.log(`[Telemetry] ${deviceId} | SpO2=${spo2Avg}% BPM=${bpmAvg} Temp=${tempAvg} -> ${analysis.status}`);
+
+  // Điều khiển LED trạng thái
+  let ledColor = 'GREEN';
+  if (analysis.status === 'CRITICAL') ledColor = 'RED';
+  else if (analysis.status === 'WATCH') ledColor = 'YELLOW';
+  publishControl(mqttClient, deviceId, 'led', { color: ledColor });
 
   if (analysis.confirmedAlert) {
     const alertRecord = {
